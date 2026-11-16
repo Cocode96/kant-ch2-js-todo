@@ -1,19 +1,19 @@
 /**
- * ���� ���, ����, ����, ��ȸ ���
+ * 할일 등록, 수정, 삭제, 조회 기능
  * 
  */
 let frmTodo;
 const todo = {
-    items: [], // ���� ��� 
-    tpl: null, // ���ø�
+    items: [], // 할일 목록 
+    tpl: null, // 템플릿
     editingUid: null,
     query: '',
-    // ���� ��ȸ
+    // 할일 조회
     get(uid) {
         const items = this.items.filter(item => item.uid === Number(uid));
         return items?.length > 0 ? items[0] : null;
     },
-    // ���� ��� 
+    // 할일 등록 
     add(date, title, content) {
     
         this.items.push({
@@ -25,19 +25,19 @@ const todo = {
    
         this.save();
 
-        // ���� ��� �� ȭ�� ����
+        // 할일 등록 후 화면 갱신
         this.render();
 
-        // ��� �ʱ�ȭ
+        // 양식 초기화
         this.resetForm();
     },
-    // ���� �׸��� ������� �ҷ��� ���� UID�� �����Ѵ�.
+    // 기존 항목을 양식으로 불러와 같은 UID로 수정한다.
     edit(uid) {
         const item = this.get(uid);
         if (!item) return;
         this.editingUid = item.uid;
         for (const key of ['date', 'title', 'content']) frmTodo[key].value = item[key];
-        frmTodo.querySelector('[type="submit"]').textContent = '���� ����';
+        frmTodo.querySelector('[type="submit"]').textContent = '수정 저장';
         document.getElementById('cancel-edit').hidden = false;
         frmTodo.title.focus();
     },
@@ -51,10 +51,10 @@ const todo = {
     resetForm() {
         this.editingUid = null;
         frmTodo.reset();
-        frmTodo.querySelector('[type="submit"]').textContent = '����ϱ�';
+        frmTodo.querySelector('[type="submit"]').textContent = '등록하기';
         document.getElementById('cancel-edit').hidden = true;
     },
-    // ���� ����
+    // 할일 제거
     remove(uid) {
         for (let i = 0; i < this.items.length; i++) {
             if (this.items[i].uid === Number(uid)) {
@@ -62,43 +62,43 @@ const todo = {
             }
         }
 
-        // ���� ����
+        // 할일 저장
         this.save();
 
         if (this.editingUid === Number(uid)) this.resetForm();
 
-        // ���� ��� �� ȭ�� ����
+        // 할일 등록 후 화면 갱신
         this.render();
     },
-    // ���� ����
+    // 할일 저장
     save() {
         localStorage.setItem("todos", JSON.stringify(this.items));
     },
-    // Todo ���ø� ��ȸ
+    // Todo 템플릿 조회
     getTpl() {
-        // ���ø��� ������ �����ϹǷ� ���� ��ȸ�� �ѹ��� ���������� ����
+        // 템플릿은 구성이 동일하므로 최초 조회시 한번만 가져오도록 구성
         if (!this.tpl) {
             this.tpl = document.getElementById("tpl-item").innerHTML;
         }
 
         return this.tpl;
     },
-    // ȭ�� ����
+    // 화면 갱신
     render() {
-        // ����� ���� ��� ��ȸ
+        // 저장된 할일 목록 조회
         this.items = localStorage.getItem("todos");
         this.items = typeof this.items === 'string' ? JSON.parse(this.items) : [];
         const targetEl = document.getElementById("todo-items");
-        // ������ �׸� ������ �˻� ��� 0���� ���� ���� ȭ���� �����.
+        // 마지막 항목 삭제나 검색 결과 0개일 때도 이전 화면을 지운다.
         targetEl.replaceChildren();
         const keyword = this.query.trim().toLowerCase();
         const visible = this.items.filter(item =>
             (item.title + ' ' + item.content).toLowerCase().includes(keyword));
         document.getElementById('todo-status').textContent = visible.length
-            ? `${visible.length}�� / ��ü ${this.items.length}��`
-            : this.items.length ? '�˻� ����� �����ϴ�.' : '��ϵ� �� ���� �����ϴ�.';
+            ? `${visible.length}개 / 전체 ${this.items.length}개`
+            : this.items.length ? '검색 결과가 없습니다.' : '등록된 할 일이 없습니다.';
 
-        // ���� ī�� HTML�� Ŭ������ �����ϰ� ����� �Է��� �ؽ�Ʈ�θ� �ִ´�.
+        // 원래 카드 HTML과 클래스를 복제하고 사용자 입력은 텍스트로만 넣는다.
         const template = document.createElement('template');
         template.innerHTML = this.getTpl();
         for (const {uid, title, content, date} of visible) {
@@ -111,9 +111,9 @@ const todo = {
             targetEl.append(card);
         }
 
-        // ����, ���� �̺�Ʈ ���ε�
+        // 삭제, 수정 이벤트 바인딩
         const removeAction = (e) => {
-            if (!confirm('���� �����ϰڽ��ϱ�?')) return;
+            if (!confirm('정말 삭제하겠습니까?')) return;
 
             const el = e.currentTarget;
             const { uid } = el.dataset;
@@ -133,7 +133,7 @@ const todo = {
 
 window.addEventListener("DOMContentLoaded", function() {
     frmTodo = document.forms.frmTodo;
-    // ���� ȭ�� ���
+    // 최초 화면 출력
     todo.render();
     document.getElementById('todo-search').addEventListener('input', function() {
         todo.query = this.value;
@@ -141,14 +141,14 @@ window.addEventListener("DOMContentLoaded", function() {
     });
     document.getElementById('cancel-edit').addEventListener('click', () => todo.resetForm());
 
-    // ��� ���� ó�� 
+    // 양식 제출 처리 
     frmTodo.addEventListener("submit", function(e) {
         e.preventDefault();
         
         const requiredFields = {
-            date: "��¥�� �����ϼ���.",
-            title: "������ �Է��ϼ���.",
-            content: "������ �Է��ϼ���."
+            date: "날짜를 선택하세요.",
+            title: "제목을 입력하세요.",
+            content: "내용을 입력하세요."
         };
 
         try {
