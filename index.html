@@ -1,13 +1,53 @@
-<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>나의 Todo</title><link rel="stylesheet" href="css/style.css"><script src="js/todo.js" defer></script></head>
-<body><main><h1>나의 Todo</h1><p>추가하고, 조회하고, 수정하고, 삭제합니다.</p>
-<form id="todo-form">
-<label>날짜 <input name="date" type="date" required></label>
-<label>제목 <input name="title" maxlength="100" required></label>
-<label>내용 <textarea name="content" maxlength="1000" required></textarea></label>
-<div><button type="submit" id="save-button">추가</button> <button type="button" id="cancel-button" hidden>수정 취소</button></div>
-</form>
-<p id="message" role="status"></p>
-<label>조회 <input id="search" type="search" placeholder="제목 또는 내용 검색"></label>
-<p id="count"></p><ul id="todo-items"></ul>
-</main></body></html>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <script src="js/todo.js"></script>
+        <title>TODO ����Ʈ</title>
+    </head>
+    <body>
+        <h1 class="text-white bg-indigo-500 p-3 mb-4 text-lg border-0">���� ���</h1>
+        <form name="frmTodo" method="post" autocomplete="off" class="mb-8">
+            <ul class="grid grid-cols-[100px_1fr] gap-4 m-4 p-4 items-center">
+                <li>��¥</li>
+                <li>
+                    <input type="date" name="date" placeholder="��¥ �Է�" class="w-full border border-gray-200 rounded-md resize-none p-2 outline-none">
+                </li>
+                <li>����</li>
+                <li>
+                    <input type="text" name="title" placeholder="���� �Է�" class="w-full border border-gray-200 rounded-md resize-none p-2 outline-none">
+                </li>
+                <li>����</li>
+                <li>
+                    <textarea name="content" placeholder="���� �Է�" class="w-full h-25 border border-gray-200 rounded-md resize-none p-4 outline-none"></textarea>
+                </li>
+            </ul>
+            <button type="submit" class="m-auto block bg-blue-500 text-white w-1/2 p-2 rounded-sm hover:bg-blue-800 cursor-pointer">����ϱ�</button>
+            <button type="button" id="cancel-edit" hidden class="m-auto block mt-2 bg-gray-500 text-white w-1/2 p-2 rounded-sm cursor-pointer">���� ���</button>
+        </form>
+        <div class="m-4 p-4">
+            <label for="todo-search">����/���� �˻�</label>
+            <input type="search" id="todo-search" placeholder="�˻��� �Է�" class="w-full border border-gray-200 rounded-md p-2 outline-none">
+            <p id="todo-status" role="status" class="mt-2"></p>
+        </div>
+
+        <ul id="todo-items" class="grid md:grid-cols-2">
+             
+        </ul>
+        <script type="text/html" id="tpl-item">
+            <li id="item-${uid}" data-uid="${uid}" class="p-3 m-3 border rounded-sm border-gray-300">
+               <div class="mb-3 text-[#50d71e] font-medium">[${date}] ${title}</div>
+               <div class="contentflex flex-col justify-between">
+                    <div class="mb-3 p-4 min-h-25 shadow-sm grow-1">${content}</div>
+                    <div class="flex justify-between">
+                        <button type="button" class="bg-red-500 hover:bg-red-800 text-white rounded-sm grow h-7 mr-1 delete-action cursor-pointer" data-uid="${uid}">����</button>
+                        <button type="button" class="bg-indigo-500 hover:bg-indigo-800 text-white rounded-sm grow h-7 edit-action cursor-pointer" data-uid="${uid}">����</button>
+                    </div>
+               </div> 
+            </li>
+        </script>
+    </body>
+</html>

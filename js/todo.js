@@ -1,116 +1,171 @@
-'use strict';
-const form = document.querySelector('#todo-form');
-const list = document.querySelector('#todo-items');
-const search = document.querySelector('#search');
-const message = document.querySelector('#message');
-const saveButton = document.querySelector('#save-button');
-const cancelButton = document.querySelector('#cancel-button');
-const storageKey = 'seokho-kant-todos-v1';
-let items = [];
-let editingId = null;
+/**
+ * ���� ���, ����, ����, ��ȸ ���
+ * 
+ */
+let frmTodo;
+const todo = {
+    items: [], // ���� ��� 
+    tpl: null, // ���ø�
+    editingUid: null,
+    query: '',
+    // ���� ��ȸ
+    get(uid) {
+        const items = this.items.filter(item => item.uid === Number(uid));
+        return items?.length > 0 ? items[0] : null;
+    },
+    // ���� ��� 
+    add(date, title, content) {
+    
+        this.items.push({
+            uid: Date.now(),
+            date,
+            title,
+            content
+        });
+   
+        this.save();
 
-try {
-  const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-  if (!Array.isArray(saved) || !saved.every(item =>
-    item && ['id', 'date', 'title', 'content'].every(key => typeof item[key] === 'string'))) {
-    throw new Error('저장 데이터 형식 오류');
-  }
-  items = saved;
-} catch {
-  message.textContent = '저장 목록을 읽지 못했습니다. 빈 목록으로 시작합니다.';
-}
+        // ���� ��� �� ȭ�� ����
+        this.render();
 
-function resetForm() {
-  editingId = null;
-  form.reset();
-  saveButton.textContent = '추가';
-  cancelButton.hidden = true;
-}
+        // ��� �ʱ�ȭ
+        this.resetForm();
+    },
+    // ���� �׸��� ������� �ҷ��� ���� UID�� �����Ѵ�.
+    edit(uid) {
+        const item = this.get(uid);
+        if (!item) return;
+        this.editingUid = item.uid;
+        for (const key of ['date', 'title', 'content']) frmTodo[key].value = item[key];
+        frmTodo.querySelector('[type="submit"]').textContent = '���� ����';
+        document.getElementById('cancel-edit').hidden = false;
+        frmTodo.title.focus();
+    },
+    update(uid, date, title, content) {
+        this.items = this.items.map(item => item.uid === Number(uid)
+            ? { ...item, date, title, content } : item);
+        this.save();
+        this.render();
+        this.resetForm();
+    },
+    resetForm() {
+        this.editingUid = null;
+        frmTodo.reset();
+        frmTodo.querySelector('[type="submit"]').textContent = '����ϱ�';
+        document.getElementById('cancel-edit').hidden = true;
+    },
+    // ���� ����
+    remove(uid) {
+        for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].uid === Number(uid)) {
+                this.items.splice(i, 1);
+            }
+        }
 
-function render() {
-  const keyword = search.value.trim().toLowerCase();
-  const visible = items.filter(item =>
-    (item.title + ' ' + item.content).toLowerCase().includes(keyword));
-  list.replaceChildren();
-  document.querySelector('#count').textContent = visible.length + '개 / 전체 ' + items.length + '개';
-  if (!visible.length) {
-    const empty = document.createElement('li');
-    empty.textContent = '표시할 할 일이 없습니다.';
-    list.append(empty);
-  }
-  visible.forEach(item => {
-    const li = document.createElement('li');
-    const title = document.createElement('h2');
-    const date = document.createElement('time');
-    const content = document.createElement('p');
-    title.textContent = item.title;
-    date.dateTime = item.date;
-    date.textContent = item.date;
-    content.textContent = item.content; // 사용자 입력을 HTML로 해석하지 않는다.
-    li.append(title, date, content);
-    ['수정', '삭제'].forEach((label, index) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = label;
-      button.dataset.action = index === 0 ? 'edit' : 'delete';
-      button.dataset.id = item.id;
-      li.append(button);
+        // ���� ����
+        this.save();
+
+        if (this.editingUid === Number(uid)) this.resetForm();
+
+        // ���� ��� �� ȭ�� ����
+        this.render();
+    },
+    // ���� ����
+    save() {
+        localStorage.setItem("todos", JSON.stringify(this.items));
+    },
+    // Todo ���ø� ��ȸ
+    getTpl() {
+        // ���ø��� ������ �����ϹǷ� ���� ��ȸ�� �ѹ��� ���������� ����
+        if (!this.tpl) {
+            this.tpl = document.getElementById("tpl-item").innerHTML;
+        }
+
+        return this.tpl;
+    },
+    // ȭ�� ����
+    render() {
+        // ����� ���� ��� ��ȸ
+        this.items = localStorage.getItem("todos");
+        this.items = typeof this.items === 'string' ? JSON.parse(this.items) : [];
+        const targetEl = document.getElementById("todo-items");
+        // ������ �׸� ������ �˻� ��� 0���� ���� ���� ȭ���� �����.
+        targetEl.replaceChildren();
+        const keyword = this.query.trim().toLowerCase();
+        const visible = this.items.filter(item =>
+            (item.title + ' ' + item.content).toLowerCase().includes(keyword));
+        document.getElementById('todo-status').textContent = visible.length
+            ? `${visible.length}�� / ��ü ${this.items.length}��`
+            : this.items.length ? '�˻� ����� �����ϴ�.' : '��ϵ� �� ���� �����ϴ�.';
+
+        // ���� ī�� HTML�� Ŭ������ �����ϰ� ����� �Է��� �ؽ�Ʈ�θ� �ִ´�.
+        const template = document.createElement('template');
+        template.innerHTML = this.getTpl();
+        for (const {uid, title, content, date} of visible) {
+            const card = template.content.firstElementChild.cloneNode(true);
+            card.id = `item-${uid}`;
+            card.dataset.uid = String(uid);
+            card.firstElementChild.textContent = `[${date}] ${title}`;
+            card.querySelector('.contentflex > div').textContent = content;
+            card.querySelectorAll('button').forEach(button => { button.dataset.uid = String(uid); });
+            targetEl.append(card);
+        }
+
+        // ����, ���� �̺�Ʈ ���ε�
+        const removeAction = (e) => {
+            if (!confirm('���� �����ϰڽ��ϱ�?')) return;
+
+            const el = e.currentTarget;
+            const { uid } = el.dataset;
+            this.remove(uid);
+        };
+        const deleteActions = document.getElementsByClassName("delete-action");
+        for (const action of deleteActions) {
+            action.addEventListener("click", removeAction);
+
+        }
+
+        for (const action of document.getElementsByClassName('edit-action')) {
+            action.addEventListener('click', event => this.edit(event.currentTarget.dataset.uid));
+        }
+    }
+};
+
+window.addEventListener("DOMContentLoaded", function() {
+    frmTodo = document.forms.frmTodo;
+    // ���� ȭ�� ���
+    todo.render();
+    document.getElementById('todo-search').addEventListener('input', function() {
+        todo.query = this.value;
+        todo.render();
     });
-    list.append(li);
-  });
-}
+    document.getElementById('cancel-edit').addEventListener('click', () => todo.resetForm());
 
-function persist() {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(items));
-    return true;
-  } catch {
-    message.textContent = '화면에는 반영했지만 저장하지 못했습니다. 새로고침하면 사라질 수 있습니다.';
-    return false;
-  }
-}
+    // ��� ���� ó�� 
+    frmTodo.addEventListener("submit", function(e) {
+        e.preventDefault();
+        
+        const requiredFields = {
+            date: "��¥�� �����ϼ���.",
+            title: "������ �Է��ϼ���.",
+            content: "������ �Է��ϼ���."
+        };
 
-form.addEventListener('submit', event => {
-  event.preventDefault();
-  const data = {
-    date: form.elements.date.value,
-    title: form.elements.title.value.trim(),
-    content: form.elements.content.value.trim()
-  };
-  if (!data.date || !data.title || !data.content) {
-    message.textContent = '날짜, 제목, 내용을 모두 입력하세요.';
-    return;
-  }
-  const action = editingId ? '수정' : '추가';
-  if (editingId) {
-    items = items.map(item => item.id === editingId ? { ...item, ...data } : item);
-  } else {
-    items = [...items, { id: crypto.randomUUID(), ...data }];
-  }
-  if (persist()) message.textContent = action + '했습니다.';
-  resetForm();
-  render();
+        try {
+            for (const [key, msg] of Object.entries(requiredFields)) {
+
+                if (!frmTodo[key]?.value?.trim()) {
+                    throw new Error(msg); 
+                }
+            }
+
+            const values = [frmTodo.date.value, frmTodo.title.value.trim(), frmTodo.content.value.trim()];
+            if (todo.editingUid !== null) todo.update(todo.editingUid, ...values);
+            else todo.add(...values);
+
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    });
 });
-
-list.addEventListener('click', event => {
-  const button = event.target.closest('button[data-id]');
-  if (!button) return;
-  const item = items.find(value => value.id === button.dataset.id);
-  if (!item) return;
-  if (button.dataset.action === 'edit') {
-    editingId = item.id;
-    ['date', 'title', 'content'].forEach(key => { form.elements[key].value = item[key]; });
-    saveButton.textContent = '수정 저장';
-    cancelButton.hidden = false;
-    form.elements.title.focus();
-  } else {
-    items = items.filter(value => value.id !== item.id);
-    if (editingId === item.id) resetForm();
-    if (persist()) message.textContent = '삭제했습니다.';
-    render();
-  }
-});
-cancelButton.addEventListener('click', resetForm);
-search.addEventListener('input', render);
-render();
-
