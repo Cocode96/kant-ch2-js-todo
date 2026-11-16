@@ -1,0 +1,8 @@
+/* 기존 보라색 헤더와 두 열 카드 디자인을 유지한다. */
+input:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 3px solid #4338ca;
+    outline-offset: 3px;
+}
+#todo-error { color: #b91c1c; }
+#todo-items li { min-width: 0; overflow-wrap: anywhere; }
+.contentflex > div { white-space: pre-wrap; }

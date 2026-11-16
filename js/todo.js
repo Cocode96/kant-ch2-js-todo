@@ -1,52 +1,60 @@
-/**
- * 할일 등록, 수정, 삭제, 조회 기능
- * 
- */
+/** 기존 todos 저장 키와 숫자 UID를 유지하는 Todo CRUD. */
 let frmTodo;
 const todo = {
-    items: [], // 할일 목록 
-    tpl: null, // 템플릿
+    items: [],
+    tpl: null,
     editingUid: null,
     query: '',
-    // 할일 조회
-    get(uid) {
-        const items = this.items.filter(item => item.uid === Number(uid));
-        return items?.length > 0 ? items[0] : null;
+    loadFailed: false,
+    load() {
+        try {
+            const parsed = JSON.parse(localStorage.getItem('todos') ?? '[]');
+            const valid = Array.isArray(parsed) && parsed.every(item =>
+                item && Number.isSafeInteger(item.uid) && item.uid > 0 &&
+                ['date', 'title', 'content'].every(key => typeof item[key] === 'string'));
+            if (!valid || new Set(parsed.map(item => item.uid)).size !== parsed.length) throw new Error('저장 형식 오류');
+            this.items = parsed;
+            this.loadFailed = false;
+        } catch {
+            this.loadFailed = true;
+            this.showError('저장된 목록을 읽지 못했습니다. 기존 데이터는 유지됩니다. 저장소 설정을 확인한 뒤 새로고침하세요.');
+        }
     },
-    // 할일 등록 
-    add(date, title, content) {
-    
-        this.items.push({
-            uid: Date.now(),
-            date,
-            title,
-            content
-        });
-   
-        this.save();
-
-        // 할일 등록 후 화면 갱신
+    get(uid) {
+        return this.items.find(item => item.uid === Number(uid)) ?? null;
+    },
+    commit(nextItems) {
+        if (this.loadFailed) throw new Error('저장된 목록을 먼저 복구한 뒤 새로고침하세요.');
+        // 저장에 성공한 뒤에만 메모리와 화면에 반영한다.
+        try { localStorage.setItem('todos', JSON.stringify(nextItems)); }
+        catch { throw new Error('저장하지 못했습니다. 저장 공간과 브라우저 설정을 확인하세요.'); }
+        this.items = nextItems;
+        this.showError('');
         this.render();
-
-        // 양식 초기화
+    },
+    add(date, title, content) {
+        const uid = this.items.reduce((next, item) => Math.max(next, item.uid + 1), Date.now());
+        if (!Number.isSafeInteger(uid)) throw new Error('새 ID를 만들 수 없습니다.');
+        this.commit([...this.items, { uid, date, title, content }]);
         this.resetForm();
     },
-    // 기존 항목을 양식으로 불러와 같은 UID로 수정한다.
     edit(uid) {
         const item = this.get(uid);
         if (!item) return;
         this.editingUid = item.uid;
-        for (const key of ['date', 'title', 'content']) frmTodo[key].value = item[key];
+        for (const key of ['date', 'title', 'content']) frmTodo.elements.namedItem(key).value = item[key];
         frmTodo.querySelector('[type="submit"]').textContent = '수정 저장';
         document.getElementById('cancel-edit').hidden = false;
-        frmTodo.title.focus();
+        frmTodo.elements.namedItem('title').focus();
     },
     update(uid, date, title, content) {
-        this.items = this.items.map(item => item.uid === Number(uid)
-            ? { ...item, date, title, content } : item);
-        this.save();
-        this.render();
+        if (!this.get(uid)) throw new Error('수정할 항목이 없습니다.');
+        this.commit(this.items.map(item => item.uid === Number(uid) ? { ...item, date, title, content } : item));
         this.resetForm();
+    },
+    remove(uid) {
+        this.commit(this.items.filter(item => item.uid !== Number(uid)));
+        if (this.editingUid === Number(uid)) this.resetForm();
     },
     resetForm() {
         this.editingUid = null;
@@ -54,118 +62,59 @@ const todo = {
         frmTodo.querySelector('[type="submit"]').textContent = '등록하기';
         document.getElementById('cancel-edit').hidden = true;
     },
-    // 할일 제거
-    remove(uid) {
-        for (let i = 0; i < this.items.length; i++) {
-            if (this.items[i].uid === Number(uid)) {
-                this.items.splice(i, 1);
-            }
-        }
-
-        // 할일 저장
-        this.save();
-
-        if (this.editingUid === Number(uid)) this.resetForm();
-
-        // 할일 등록 후 화면 갱신
-        this.render();
+    showError(message) {
+        document.getElementById('todo-error').textContent = message;
     },
-    // 할일 저장
-    save() {
-        localStorage.setItem("todos", JSON.stringify(this.items));
-    },
-    // Todo 템플릿 조회
-    getTpl() {
-        // 템플릿은 구성이 동일하므로 최초 조회시 한번만 가져오도록 구성
-        if (!this.tpl) {
-            this.tpl = document.getElementById("tpl-item").innerHTML;
-        }
-
-        return this.tpl;
-    },
-    // 화면 갱신
     render() {
-        // 저장된 할일 목록 조회
-        this.items = localStorage.getItem("todos");
-        this.items = typeof this.items === 'string' ? JSON.parse(this.items) : [];
-        const targetEl = document.getElementById("todo-items");
-        // 마지막 항목 삭제나 검색 결과 0개일 때도 이전 화면을 지운다.
-        targetEl.replaceChildren();
+        const target = document.getElementById('todo-items');
         const keyword = this.query.trim().toLowerCase();
-        const visible = this.items.filter(item =>
-            (item.title + ' ' + item.content).toLowerCase().includes(keyword));
-        document.getElementById('todo-status').textContent = visible.length
-            ? `${visible.length}개 / 전체 ${this.items.length}개`
+        const visible = this.items.filter(item => (item.title + ' ' + item.content).toLowerCase().includes(keyword));
+        document.getElementById('todo-status').textContent = this.loadFailed ? '목록을 불러올 수 없습니다.' : visible.length
+            ? visible.length + '개 / 전체 ' + this.items.length + '개'
             : this.items.length ? '검색 결과가 없습니다.' : '등록된 할 일이 없습니다.';
-
-        // 원래 카드 HTML과 클래스를 복제하고 사용자 입력은 텍스트로만 넣는다.
-        const template = document.createElement('template');
-        template.innerHTML = this.getTpl();
+        if (!this.tpl) {
+            this.tpl = document.createElement('template');
+            this.tpl.innerHTML = document.getElementById('tpl-item').innerHTML;
+        }
+        const fragment = document.createDocumentFragment();
         for (const {uid, title, content, date} of visible) {
-            const card = template.content.firstElementChild.cloneNode(true);
-            card.id = `item-${uid}`;
+            const card = this.tpl.content.firstElementChild.cloneNode(true);
+            card.id = 'item-' + uid;
             card.dataset.uid = String(uid);
-            card.firstElementChild.textContent = `[${date}] ${title}`;
+            // 템플릿만 HTML로 읽고 사용자 입력은 항상 textContent로 출력한다.
+            card.firstElementChild.textContent = '[' + date + '] ' + title;
             card.querySelector('.contentflex > div').textContent = content;
             card.querySelectorAll('button').forEach(button => { button.dataset.uid = String(uid); });
-            targetEl.append(card);
+            fragment.append(card);
         }
-
-        // 삭제, 수정 이벤트 바인딩
-        const removeAction = (e) => {
-            if (!confirm('정말 삭제하겠습니까?')) return;
-
-            const el = e.currentTarget;
-            const { uid } = el.dataset;
-            this.remove(uid);
-        };
-        const deleteActions = document.getElementsByClassName("delete-action");
-        for (const action of deleteActions) {
-            action.addEventListener("click", removeAction);
-
-        }
-
-        for (const action of document.getElementsByClassName('edit-action')) {
-            action.addEventListener('click', event => this.edit(event.currentTarget.dataset.uid));
-        }
+        target.replaceChildren(fragment);
     }
 };
-
-window.addEventListener("DOMContentLoaded", function() {
+window.addEventListener('DOMContentLoaded', () => {
     frmTodo = document.forms.frmTodo;
-    // 최초 화면 출력
+    todo.load();
     todo.render();
-    document.getElementById('todo-search').addEventListener('input', function() {
-        todo.query = this.value;
+    document.getElementById('todo-search').addEventListener('input', event => {
+        todo.query = event.currentTarget.value;
         todo.render();
     });
     document.getElementById('cancel-edit').addEventListener('click', () => todo.resetForm());
-
-    // 양식 제출 처리 
-    frmTodo.addEventListener("submit", function(e) {
-        e.preventDefault();
-        
-        const requiredFields = {
-            date: "날짜를 선택하세요.",
-            title: "제목을 입력하세요.",
-            content: "내용을 입력하세요."
-        };
-
+    // 목록 컨테이너에 한 번만 바인딩한다. 재렌더링 후에도 동일하게 동작한다.
+    document.getElementById('todo-items').addEventListener('click', event => {
+        const button = event.target.closest('button[data-uid]');
+        if (!button || !event.currentTarget.contains(button)) return;
         try {
-            for (const [key, msg] of Object.entries(requiredFields)) {
-
-                if (!frmTodo[key]?.value?.trim()) {
-                    throw new Error(msg); 
-                }
-            }
-
-            const values = [frmTodo.date.value, frmTodo.title.value.trim(), frmTodo.content.value.trim()];
-            if (todo.editingUid !== null) todo.update(todo.editingUid, ...values);
-            else todo.add(...values);
-
-        } catch (err) {
-            console.error(err);
-            alert(err.message);
-        }
+            if (button.classList.contains('edit-action')) todo.edit(button.dataset.uid);
+            if (button.classList.contains('delete-action') && confirm('정말 삭제하겠습니까?')) todo.remove(button.dataset.uid);
+        } catch (error) { todo.showError(error.message); }
+    });
+    frmTodo.addEventListener('submit', event => {
+        event.preventDefault();
+        const fields = ['date', 'title', 'content'].map(key => frmTodo.elements.namedItem(key).value.trim());
+        try {
+            if (fields.some(value => !value)) throw new Error('날짜, 제목, 내용을 입력하세요.');
+            if (todo.editingUid !== null) todo.update(todo.editingUid, ...fields);
+            else todo.add(...fields);
+        } catch (error) { todo.showError(error.message); }
     });
 });
